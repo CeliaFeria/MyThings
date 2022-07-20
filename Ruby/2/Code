@@ -1,0 +1,8 @@
+Este código realiza las siguientes acciones:
+- Create an “InteractionNetwork” Object to contain the members of each network
+
+- Annotate it with any KEGG Pathways the interaction network members are part of both KEGG ID and Pathway Name
+
+- Annotate it with the GO Terms associated with the total of all genes in the network
+
+- Create a report of which members of the gene list interact with one another, together with the KEGG/GO functional annotations of those interacting members.
