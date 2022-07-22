@@ -1,1 +1,6 @@
-
+Este código realiza las siguientes acciones:
+- Usar bioruby para examinar secuencias de genes de Arabidopsis
+- Detectar las secuencias CTTCTT
+- Marcar las coordenadas de las secuencias CTTCTT
+- Crear archivo GFF3 
+- Obtener un report 
