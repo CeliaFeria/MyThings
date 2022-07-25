@@ -1,0 +1,149 @@
+---
+title: "Biologia_sintetica_1"
+author: "Celia feria Delgado"
+date: "3/12/2021"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, echo = TRUE)
+#install.packages("dplyr") 
+library(dplyr) 
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages("network")
+library(network)
+library(broom)
+library(igraph)
+```
+
+
+```{r}
+setwd("C:/Users/celia/OneDrive/Documentos/master/biología sintética")
+```
+
+### Creation of the networks from data and random
+```{r}
+#Obtaining the information from the file
+network_tf_gene <- read.delim("~/master/biología sintética/network_tf_gene.txt", header=FALSE, comment.char="#")
+
+all_info <- data.frame(network_tf_gene)
+all_info <- data.frame(lapply(all_info, function(v) {
+  if (is.character(v)) return(toupper(v))
+  else return(v)
+}))
+
+#I delete the columns that are not important
+
+borrar <- c("V1","V3","V6","V7","V8")
+names_relation <- all_info[ , !(names(all_info) %in% borrar)]
+head(names_relation, n=9)
+
+#Create matrix with the interactions
+
+levs <- unique(unlist(names_relation, use.names=F))
+length(levs)
+
+matrix <- function() {
+  names_relation %>%
+    mutate_each(funs(factor(., levs))) %>%
+    group_by(V2, V4) %>%
+    tally() %>%   #count the repeats interacctions
+    spread(V4, n, drop=FALSE, fill=0)
+}
+dim(matrix())
+matrix <- matrix()
+
+#Delete the names in order to have a square matrix
+matrix2 <- matrix[, -1]
+colnames(matrix2) <- NULL
+
+```
+
+```{r}
+#Create the graph and visualize 
+
+net<-graph.adjacency(as.matrix(matrix2))
+
+plot(net, edge.arrow.size=.2, vertex.color="orange", vertex.frame.color="#555555",vertex.label.color="black",
+     layout = layout_nicely(net))
+
+
+#Using network package we can visualize better
+network <- network(as.matrix(matrix2), vertex.attr = NULL, ignore.eval = FALSE, multiple = TRUE, loops = TRUE)
+network
+plot(network)
+
+```
+
+```{r}
+#Ramdom matrix
+
+#sum all the interactions in our matrix
+sum_partial = rowSums(matrix2)  
+n_edges = sum(sum_partial)
+n_edges
+
+rnd <- matrix(0,1923,1923)  #use the same dimension as our matrix
+
+rndrow <- sample(1:1923, n_edges, replace =TRUE)
+rndcol <- sample(1:1923, n_edges, replace =TRUE)
+rnd[cbind(rndrow,rndcol)] <-1
+
+dim(rnd)
+
+#Creation of the network and visualization
+net2<-graph.adjacency(as.matrix(rnd))
+plot(net2, edge.arrow.size=.2, vertex.color="orange", vertex.frame.color="#555555",vertex.label.color="black",
+     layout = layout_nicely(net)) 
+
+```
+
+#### Real network
+```{r}
+
+#path length 
+tab <- as.table(path.length.hist(net)$res)
+names(tab) <- 1:length(tab)
+barplot(tab)
+
+#maximum legnth as we could see in the histogram
+print("Maximum length path")
+diameter(net, unconnected = TRUE, weights = NULL)
+
+
+#feed-forward loop
+print("Feed-forward loop")
+sum(count_triangles(net))
+
+
+#Autoregulation
+print("Autoregulation")
+sum(diag(as.matrix(matrix2)))
+
+```
+
+#### Random network
+```{r}
+
+#path length 
+tab <- as.table(path.length.hist(net2)$res)
+names(tab) <- 1:length(tab)
+barplot(tab)
+
+#maximum legnth as we could see in the histogram
+print("Maximum length path")
+diameter(net2, unconnected = TRUE, weights = NULL)
+
+
+#feed-forward loop 
+print("Feed-forward loop")
+sum(count_triangles(net2))
+
+#Atoregulation
+print("Autoregulation")
+sum(diag(as.matrix(rnd)))
+
+```
+
+
+
