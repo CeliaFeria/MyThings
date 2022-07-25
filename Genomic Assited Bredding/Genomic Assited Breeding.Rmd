@@ -1,0 +1,166 @@
+---
+title: "Genomic Ass Breeding"
+author: "Celia feria Delgado"
+date: "25/7/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+install.packages("rrBLUP", repos = "http://cran.us.r-project.org")
+library(tidyverse)
+library(dplyr)
+library(rrBLUP)
+library(lme4)
+```
+
+```{r, include = FALSE}
+setwd("~/master/Genetic Assited Breeding/Assig 6")
+
+```
+
+
+## One step GBLUP
+
+```{r}
+load("C:/Users/celia/OneDrive/Documentos/master/Genetic Assited Breeding/Assig 6/WheatData.yield.RData")
+
+str(genodata)
+str(phenodata.yield)
+```
+
+
+```{r}
+GENO <- A.mat(genodata,impute.method = "EM",return.imputed = T)
+Kmatrix <- GENO$A
+W <- GENO$imputed
+intersectnames <- intersect(phenodata.yield$Taxa,rownames(W))
+W <- W[rownames(W)%in%intersectnames,]
+
+```
+
+
+
+```{r}
+
+phenodata.yield <- phenodata.yield[phenodata.yield$Taxa%in%intersectnames,]
+phenodata.yield$Taxa <- factor(phenodata.yield$Taxa,levels=rownames(W))
+set.seed(12)
+Train <- sample(rownames(W), size=ceiling(nrow(W)*0.6), replace=F)
+Test <- setdiff(rownames(W),Train)
+phenotrain <- phenodata.yield[phenodata.yield$Taxa%in%Train,]
+phenotest <- phenodata.yield[phenodata.yield$Taxa%in%Test,]
+
+
+```
+
+
+```{r}
+Genodatatrain <- W[rownames(W)%in%Train,]
+Genodatatest <- W[rownames(W)%in%Test,]
+Xtrain <- model.matrix(~phenotrain$Env)
+Ztrain <- model.matrix(~phenotrain$Taxa-1)
+Ztest<-model.matrix(~phenotest$Taxa-1)
+Kmatrix <- Kmatrix[rownames(Kmatrix)%in%rownames(W),colnames(Kmatrix)%in%rownames(W)]
+dim(Xtrain);dim(Ztrain);dim(phenotrain);dim(Kmatrix);dim(Ztest)
+
+```
+
+Using mixed.solve from rrBLUP, calculate the lines effect using the GBLUP model
+
+```{r}
+GGBLUP <- mixed.solve(y=phenotrain$yield,X=Xtrain,Z=Ztrain,K=Kmatrix,method="REML")
+GEBVs_onestep_GBLUP <- GGBLUP$u ; hist(GEBVs_onestep_GBLUP)
+```
+```{r}
+#What will be the GEBVs prediction on the TEST SET
+GEBVs_test <- Ztest%*%GEBVs_onestep_GBLUP
+GEBVs_test <- GEBVs_onestep_GBLUP[names(GEBVs_onestep_GBLUP)%in%Test]
+GEBVs_test <- data.frame(names=rownames(GEBVs_test),GEBVs=GEBVs_test)
+GEBVs_test <- GEBVs_test [order(GEBVs_test$GEBVs,decreasing=T),]
+rownames(GEBVs_test) <- NULL
+GEBVs_test[1:10,]
+
+```
+
+```{r}
+#accuracy 
+cor(Ztest%*%GEBVs_onestep_GBLUP,phenotest$yield)
+
+```
+
+
+## Two step rrBLUP
+
+```{r}
+
+blups_model <- lme4::lmer(phenotrain$yield~Env+(1|Taxa),data=phenotrain)
+summary(blups_model)
+
+```
+
+
+
+```{r}
+
+one_step <- lme4::ranef(blups_model)[[1]]
+colnames(one_step) <- "Blups"
+hist(one_step$Blups,main ="BLUPs")
+
+```
+```{r}
+#Calculate marker effects
+
+
+Twostep <- mixed.solve(one_step$Blups,X=NULL, Z=Genodatatrain,K=NULL)
+markereffects <- Twostep$u
+GEBVs_Twostep <- W%*%markereffects
+
+#correlation
+cor(GEBVs_Twostep,GEBVs_onestep_GBLUP)
+
+#accuracy
+cor(Ztest%*%GEBVs_Twostep,phenotest$yield)
+
+
+```
+
+
+## One step rrBLUP
+
+```{r}
+onesteprrBLUP <- mixed.solve(phenotrain$yield,X=Xtrain,Z=Ztrain%*%W,K=NULL)
+markereffects_onestep <- matrix(onesteprrBLUP$u, ncol=1)
+GEBVs_onestep_rrBLUP <- W%*%markereffects_onestep
+#GBLUP AND rrBLUP equivalent?
+cor(GEBVs_onestep_rrBLUP,GEBVs_onestep_GBLUP)
+
+
+```
+
+
+```{r}
+
+#Correlation with the phenotypes in the test.
+cor(phenotest$yield,Ztest%*%GEBVs_onestep_rrBLUP)
+
+
+
+#Correlation with the phenotypes in the train
+cor(phenotrain$yield,Ztrain%*%GEBVs_onestep_rrBLUP)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
